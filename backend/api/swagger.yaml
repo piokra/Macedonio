@@ -1,0 +1,487 @@
+---
+swagger: "2.0"
+info:
+  description: "Macedon.io API\n"
+  version: "1.0.0"
+  title: "Macedon.io"
+  license:
+    name: "Apache 2.0"
+    url: "http://www.apache.org/licenses/LICENSE-2.0.html"
+host: "127.0.0.1"
+basePath: "/macedonio/1.0.0"
+tags:
+- name: "graph"
+  description: "Your goals in graph form"
+- name: "goals"
+  description: "Create and find goal graphs"
+- name: "notifications"
+  description: "Notifications about goal progress"
+- name: "user"
+  description: "Operations about user"
+- name: "config"
+  description: "Config operations"
+- name: "scheduler"
+  description: "Schedule actions"
+schemes:
+- "https"
+paths:
+  /goal:
+    post:
+      tags:
+      - "graph"
+      summary: "Create new graph"
+      operationId: "addGraph"
+      consumes:
+      - "application/json"
+      produces:
+      - "application/json"
+      parameters:
+      - in: "body"
+        name: "body"
+        description: "Graph object to be added"
+        required: true
+        schema:
+          $ref: "#/definitions/Graph"
+        x-exportParamName: "Body"
+      responses:
+        "200":
+          description: "OK"
+        "401":
+          description: "Unauthorized"
+        "405":
+          description: "Invalid input"
+      security:
+      - goal_auth:
+        - "write:graphs"
+  /goal/{goalID}:
+    get:
+      tags:
+      - "graph"
+      summary: "Get new graph"
+      operationId: "getGraph"
+      consumes:
+      - "application/json"
+      produces:
+      - "application/json"
+      parameters:
+      - name: "goalID"
+        in: "path"
+        required: true
+        type: "string"
+        format: "uuid"
+        x-exportParamName: "GoalID"
+      responses:
+        "200":
+          description: "Graph of goalID"
+          schema:
+            $ref: "#/definitions/Graph"
+  /goals:
+    get:
+      tags:
+      - "graph"
+      summary: "Get list of (filtered) goals"
+      consumes:
+      - "application/json"
+      produces:
+      - "application/json"
+      parameters:
+      - in: "body"
+        name: "body"
+        description: "Filter object"
+        required: false
+        schema:
+          $ref: "#/definitions/GoalFilter"
+        x-exportParamName: "Body"
+      responses:
+        "200":
+          description: "OK"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/Graph"
+        "401":
+          description: "Unauthorized"
+  /user:
+    post:
+      tags:
+      - "user"
+      summary: "Create user"
+      description: "This can only be done by the logged in user."
+      operationId: "createUser"
+      produces:
+      - "application/json"
+      - "application/xml"
+      parameters:
+      - in: "body"
+        name: "body"
+        description: "Created user object"
+        required: true
+        schema:
+          $ref: "#/definitions/User"
+        x-exportParamName: "Body"
+      responses:
+        default:
+          description: "successful operation"
+  /user/createWithArray:
+    post:
+      tags:
+      - "user"
+      summary: "Creates list of users with given input array"
+      operationId: "createUsersWithArrayInput"
+      produces:
+      - "application/json"
+      - "application/xml"
+      parameters:
+      - in: "body"
+        name: "body"
+        description: "List of user object"
+        required: true
+        schema:
+          type: "array"
+          items:
+            $ref: "#/definitions/User"
+        x-exportParamName: "Body"
+      responses:
+        default:
+          description: "successful operation"
+  /user/createWithList:
+    post:
+      tags:
+      - "user"
+      summary: "Creates list of users with given input array"
+      operationId: "createUsersWithListInput"
+      produces:
+      - "application/json"
+      - "application/xml"
+      parameters:
+      - in: "body"
+        name: "body"
+        description: "List of user object"
+        required: true
+        schema:
+          type: "array"
+          items:
+            $ref: "#/definitions/User"
+        x-exportParamName: "Body"
+      responses:
+        default:
+          description: "successful operation"
+  /user/login:
+    get:
+      tags:
+      - "user"
+      summary: "Logs user into the system"
+      operationId: "loginUser"
+      produces:
+      - "application/json"
+      - "application/xml"
+      parameters:
+      - name: "username"
+        in: "query"
+        description: "The user name for login"
+        required: true
+        type: "string"
+        x-exportParamName: "Username"
+      - name: "password"
+        in: "query"
+        description: "The password for login in clear text"
+        required: true
+        type: "string"
+        x-exportParamName: "Password"
+      responses:
+        "200":
+          description: "successful operation"
+          headers:
+            X-Rate-Limit:
+              type: "integer"
+              format: "int32"
+              description: "calls per hour allowed by the user"
+            X-Expires-After:
+              type: "string"
+              format: "date-time"
+              description: "date in UTC when token expires"
+          schema:
+            type: "string"
+        "400":
+          description: "Invalid username/password supplied"
+  /user/logout:
+    get:
+      tags:
+      - "user"
+      summary: "Logs out current logged in user session"
+      operationId: "logoutUser"
+      produces:
+      - "application/json"
+      - "application/xml"
+      parameters: []
+      responses:
+        default:
+          description: "successful operation"
+  /user/{username}:
+    get:
+      tags:
+      - "user"
+      summary: "Get user by user name"
+      operationId: "getUserByName"
+      produces:
+      - "application/json"
+      - "application/xml"
+      parameters:
+      - name: "username"
+        in: "path"
+        description: "The name that needs to be fetched. Use user1 for testing."
+        required: true
+        type: "string"
+        x-exportParamName: "Username"
+      responses:
+        "200":
+          description: "successful operation"
+          schema:
+            $ref: "#/definitions/User"
+        "400":
+          description: "Invalid username supplied"
+        "404":
+          description: "User not found"
+    put:
+      tags:
+      - "user"
+      summary: "Updated user"
+      description: "This can only be done by the logged in user."
+      operationId: "updateUser"
+      produces:
+      - "application/json"
+      - "application/xml"
+      parameters:
+      - name: "username"
+        in: "path"
+        description: "name that need to be updated"
+        required: true
+        type: "string"
+        x-exportParamName: "Username"
+      - in: "body"
+        name: "body"
+        description: "Updated user object"
+        required: true
+        schema:
+          $ref: "#/definitions/User"
+        x-exportParamName: "Body"
+      responses:
+        "400":
+          description: "Invalid user supplied"
+        "404":
+          description: "User not found"
+    delete:
+      tags:
+      - "user"
+      summary: "Delete user"
+      description: "This can only be done by the logged in user."
+      operationId: "deleteUser"
+      produces:
+      - "application/json"
+      - "application/xml"
+      parameters:
+      - name: "username"
+        in: "path"
+        description: "The name that needs to be deleted"
+        required: true
+        type: "string"
+        x-exportParamName: "Username"
+      responses:
+        "400":
+          description: "Invalid username supplied"
+        "404":
+          description: "User not found"
+  /config:
+    get:
+      tags:
+      - "config"
+      summary: "Access all fields of config"
+      operationId: "getConfig"
+      parameters: []
+      responses:
+        "200":
+          description: "OK"
+        "401":
+          description: "Forbidden"
+    post:
+      tags:
+      - "config"
+      summary: "Replace provided fields"
+      operationId: "updateConfig"
+      parameters:
+      - in: "body"
+        name: "body"
+        required: true
+        schema:
+          $ref: "#/definitions/Config"
+        x-exportParamName: "Body"
+      responses:
+        "200":
+          description: "OK"
+        "401":
+          description: "Forbidden"
+securityDefinitions:
+  goal_auth:
+    type: "oauth2"
+    authorizationUrl: "https://0.0.0.0"
+    flow: "implicit"
+    scopes:
+      write:graphs: "modify graphs"
+      read:graphs: "read graphs"
+      write:config: "write config"
+      read:config: "read config"
+      write:notification: "write notification"
+      read:notification: "read notification"
+      write:scheduler: "w scheduler"
+      read:scheduler: "r scheduler"
+  api_key:
+    type: "apiKey"
+    name: "api_key"
+    in: "header"
+definitions:
+  Graph:
+    type: "object"
+    required:
+    - "id"
+    - "nodes"
+    properties:
+      id:
+        type: "string"
+        format: "uuid"
+      nodes:
+        type: "array"
+        items:
+          $ref: "#/definitions/Node"
+      tags:
+        type: "array"
+        items:
+          $ref: "#/definitions/Tag"
+    example:
+      nodes:
+      - graphType: {}
+        edges:
+        - "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+        - "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+        name: "name"
+        x: 0
+        description: "description"
+        y: 6
+        id: "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+      - graphType: {}
+        edges:
+        - "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+        - "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+        name: "name"
+        x: 0
+        description: "description"
+        y: 6
+        id: "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+      id: "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+      tags:
+      - name: "name"
+        id: 1
+      - name: "name"
+        id: 1
+  Node:
+    type: "object"
+    required:
+    - "edges"
+    - "graphType"
+    - "id"
+    properties:
+      id:
+        type: "string"
+        format: "uuid"
+      edges:
+        type: "array"
+        items:
+          type: "string"
+          format: "uuid"
+      name:
+        type: "string"
+      description:
+        type: "string"
+      x:
+        type: "integer"
+      y:
+        type: "integer"
+      graphType:
+        $ref: "#/definitions/GraphType"
+    example:
+      graphType: {}
+      edges:
+      - "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+      - "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+      name: "name"
+      x: 0
+      description: "description"
+      y: 6
+      id: "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+  GraphType:
+    type: "string"
+    enum:
+    - "private"
+    - "shared"
+    - "public"
+    - "template"
+  User:
+    type: "object"
+    properties:
+      id:
+        type: "integer"
+        format: "int64"
+      username:
+        type: "string"
+      email:
+        type: "string"
+      password:
+        type: "string"
+        format: "password"
+      userStatus:
+        type: "integer"
+        format: "int32"
+        description: "User Status"
+    example:
+      password: "password"
+      userStatus: 6
+      id: 0
+      email: "email"
+      username: "username"
+  Tag:
+    type: "object"
+    properties:
+      id:
+        type: "integer"
+        format: "int64"
+      name:
+        type: "string"
+    xml:
+      name: "Tag"
+    example:
+      name: "name"
+      id: 1
+  Config:
+    type: "object"
+  ApiResponse:
+    type: "object"
+    properties:
+      code:
+        type: "integer"
+        format: "int32"
+      type:
+        type: "string"
+      message:
+        type: "string"
+  GoalFilter:
+    type: "object"
+    properties:
+      tag:
+        type: "array"
+        items:
+          $ref: "#/definitions/Tag"
+    example:
+      tag:
+      - name: "name"
+        id: 1
+      - name: "name"
+        id: 1
