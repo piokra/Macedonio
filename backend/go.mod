@@ -1,4 +1,4 @@
-module github.com/piokra/Macedonio/tree/master/backend
+module github.com/piokra/Macedonio/backend
 
 go 1.13
 
