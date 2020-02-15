@@ -19,11 +19,9 @@ func InitDBHandle() error {
 	}
 
 	host := os.Getenv("MYSQL_HOSTNAME")
-	database := os.Getenv("MYSQL_DB")
-	user := os.Getenv("MYSQL_USER")
 	pwd := os.Getenv("MYSQL_PASSWORD")
 
-	db, err := gorm.Open("mysql", fmt.Sprintf("Server=%s;Database=%s;Uid=%s;Pwd=%s", host, database, user, pwd))
+	db, err := gorm.Open("mysql", fmt.Sprintf("Server=%s;Database=Macedonio;Pwd=%s", host, pwd))
 	if err != nil {
 		return err
 	}

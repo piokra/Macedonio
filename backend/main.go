@@ -20,18 +20,18 @@ import (
 	//
 	//    sw "github.com/myname/myrepo/go"
 	//
-	sw "github.com/piokra/Macedonio/backend/go"
+	. "github.com/piokra/macedonio/backend/go"
 )
 
 func main() {
 	log.Printf("Server started")
-	if err := sw.InitDBHandle(); err != nil {
+	if err := InitDB(); err != nil {
 		log.Printf("Failed to init db. Err: %v\n", err)
 		panic(err)
 	}
-	sw.AutoMigrateUserSchemas()
+	AutoMigrateUserSchemas()
 
-	router := sw.NewRouter()
+	router := NewRouter()
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }

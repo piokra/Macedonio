@@ -1,0 +1,23 @@
+version: '2'
+
+services:
+  db:
+    image: mysql:5.7
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+    container_name: macedonio_mysql_db
+
+  wordpress:
+    depends_on:
+      - db
+    build: backend/
+    restart: always
+    environment:
+      MYSQL_HOSTNAME: db
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    container_name: macedonio_backend
+volumes:
+  db_data:
