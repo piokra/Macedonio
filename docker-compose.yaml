@@ -1,4 +1,4 @@
-version: '2'
+version: '3'
 
 services:
   db:
@@ -7,17 +7,28 @@ services:
       - db_data:/var/lib/mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      MYSQL_DATABASE: Macedonio
+      MYSQL_USER: macedonio
+      MYSQL_PASSWORD: ${DB_PASSWORD}
     container_name: macedonio_mysql_db
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
 
-  wordpress:
+
+  macedonio_backend:
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     build: backend/
     restart: always
     environment:
       MYSQL_HOSTNAME: db
       MYSQL_PASSWORD: ${DB_PASSWORD}
     container_name: macedonio_backend
+    ports:
+      - 8080:8080
 volumes:
   db_data:

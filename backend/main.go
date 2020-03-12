@@ -10,22 +10,14 @@
 package main
 
 import (
+	. "github.com/piokra/macedonio/backend/go"
 	"log"
 	"net/http"
-
-	// WARNING!
-	// Change this to a fully-qualified import path
-	// once you place this file into your project.
-	// For example,
-	//
-	//    sw "github.com/myname/myrepo/go"
-	//
-	. "github.com/piokra/macedonio/backend/go"
 )
 
 func main() {
 	log.Printf("Server started")
-	if err := InitDB(); err != nil {
+	if err := InitDBHandle(); err != nil {
 		log.Printf("Failed to init db. Err: %v\n", err)
 		panic(err)
 	}

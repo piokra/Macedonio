@@ -11,6 +11,7 @@ package macedonio
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -20,12 +21,16 @@ import (
 	"time"
 )
 
+const (
+	TOKEN    = "token"
+	USERNAME = "username"
+)
+
 func CreateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	var user User
 
-	defer r.Body.Close()
 	body, err := ioutil.ReadAll(r.Body)
 
 	if err != nil {
@@ -78,28 +83,108 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 
 func CreateUsersWithArrayInput(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusNotImplemented)
 }
 
 func CreateUsersWithListInput(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusNotImplemented)
 }
 
 func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
+	cookies := ExtractCookies(r.Cookies())
+
+	token, ok := cookies[TOKEN]
+
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	dbUser, err := TokenToUser(token.Value)
+
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		log.Printf("failed to get user by token. reason: %v\n", err)
+		return
+	}
+
+	username := r.URL.Query().Get(USERNAME)
+
+	if username == "" || username != dbUser.Username {
+		w.WriteHeader(http.StatusUnauthorized)
+		log.Printf("unauthorized deletion attempt. user requested: %s. actual: %s", username, dbUser.Username)
+		return
+	}
+
+	GetDBHandle().Delete(&dbUser)
+
 	w.WriteHeader(http.StatusOK)
+}
+
+func ExtractCookies(cookies []*http.Cookie) map[string]*http.Cookie {
+	ans := make(map[string]*http.Cookie)
+
+	for _, cookie := range cookies {
+		if cookie != nil {
+			ans[cookie.Name] = cookie
+		}
+	}
+	return ans
 }
 
 func GetUserByName(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
+	username := r.URL.Query().Get(USERNAME)
+
+	var dbUser DBUser
+
+	if err := GetDBHandle().Where("username = ?", username).First(&dbUser).Error; err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusNotAcceptable)
+		return
+	}
+
+	cookies := ExtractCookies(r.Cookies())
+	token := cookies[TOKEN]
+
+	tokenUser, err := TokenToUser(token.Value)
+
+	if err != nil {
+		tokenUser = DBUser{Username: ""}
+	}
+
+	var user User
+
+	user.Username = username
+	if tokenUser.Username == username {
+		user.Email = tokenUser.Email
+		user.Id = int64(tokenUser.ID)
+	}
+
+	data, err := json.Marshal(&user)
+
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if c, err := w.Write(data); c != len(data) || err != nil {
+		log.Println(c, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
 func LoginUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	defer r.Body.Close()
 	body, err := ioutil.ReadAll(r.Body)
 
 	if err != nil {
@@ -133,7 +218,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 	saltedPassword = append(saltedPassword, []byte(loginData.Password)...)
 	if err := bcrypt.CompareHashAndPassword(dbUser.SaltedPasswordHash, saltedPassword); err != nil {
 		log.Printf("Invalid password for user: %s\n", loginData.Username)
-		w.WriteHeader(http.StatusForbidden)
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
@@ -142,7 +227,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 	u, err := uuid.NewRandom()
 	if err != nil {
 		log.Printf("UUID failed for user: %s. Err: %v\n", loginData.Username, err)
-		w.WriteHeader(http.StatusForbidden)
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
@@ -150,7 +235,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Printf("UUID failed for user: %s. Err: %v\n", loginData.Username, err)
-		w.WriteHeader(http.StatusForbidden)
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
@@ -159,7 +244,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		Scope:     "all",
 		ExpiresAt: expiresAt,
 	}
-	copy(dbToken.Token[:], token)
+	dbToken.Token = append(dbToken.Token, token...)
 
 	if err = GetDBHandle().Create(&dbToken).Error; err != nil {
 		log.Printf("Failed to create token for user: %s. Err: %v", loginData.Username, err)
@@ -167,24 +252,138 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenJson, err := json.Marshal(&dbToken)
-	if err != nil {
-		log.Printf("Failed to marshal json for user: %s. Err: %v", loginData.Username, err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	cookie := http.Cookie{
+		Name:    TOKEN,
+		Value:   base64.StdEncoding.EncodeToString(token),
+		Expires: expiresAt,
+		Secure:  true,
 	}
 
-	w.Write(tokenJson)
-
+	http.SetCookie(w, &cookie)
 	w.WriteHeader(http.StatusOK)
 }
 
 func LogoutUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
+	cookies := ExtractCookies(r.Cookies())
+	token, ok := cookies[TOKEN]
+
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	dbToken, err := TokenToDBToken(token.Value)
+
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	err = GetDBHandle().Delete(&dbToken).Error
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
+	var user User
+
+	data, err := ioutil.ReadAll(r.Body)
+
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusNotAcceptable)
+		return
+	}
+
+	err = json.Unmarshal(data, &user)
+
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusNotAcceptable)
+		return
+	}
+
+	cookies := ExtractCookies(r.Cookies())
+	token, ok := cookies[TOKEN]
+
+	if !ok {
+		log.Println(err)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	dbUser, err := TokenToUser(token.Value)
+
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	db := GetDBHandle()
+	db.Begin()
+
+	if user.Password != "" {
+		var salt [64]byte
+		_, err = rand.Read(salt[:])
+
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		saltedPassword := append(salt[:], []byte(user.Password)...)
+
+		hash, err := bcrypt.GenerateFromPassword(saltedPassword, bcrypt.DefaultCost)
+
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		dbUser.SaltedPasswordHash = hash
+		dbUser.Salt = salt[:]
+	}
+	if user.Username != "" {
+		dbUser.Username = user.Username
+	}
+	if user.Email != "" {
+		dbUser.Email = user.Email
+	}
+
+	if err := db.Save(&dbUser).Error; err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusNotAcceptable)
+		db.Rollback()
+		return
+	}
+
+	if err := db.Model(&dbUser).Related(&dbUser.Tokens).Error; err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		db.Rollback()
+		return
+	}
+
+	for _, token := range dbUser.Tokens {
+		if err := db.Delete(&token).Error; err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			db.Rollback()
+			return
+		}
+	}
+
+	db.Commit()
 	w.WriteHeader(http.StatusOK)
 }

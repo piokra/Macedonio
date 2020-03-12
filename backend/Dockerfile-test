@@ -1,0 +1,8 @@
+FROM golang
+COPY go ./app
+COPY go.mod ./app
+COPY go.sum ./app
+
+RUN cd app; go get
+
+CMD cd app; go test -v

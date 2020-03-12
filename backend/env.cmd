@@ -1,0 +1,1 @@
+set DB_PASSWORD=password
